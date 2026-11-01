@@ -26,8 +26,8 @@ Choose separately for the controller, managed node 1, and managed node 2. The se
 | Machine | Private IP | Resources |
 | --- | --- | --- |
 | controller | 172.16.0.2 | 1 CPU, 2 GiB RAM |
-| node-01 | 172.16.0.3 | 1 CPU, 1 GiB RAM |
-| node-02 | 172.16.0.4 | 1 CPU, 1 GiB RAM |
+| `<os>-01` | 172.16.0.3 | 1 CPU, 1 GiB RAM |
+| `<os>-02` | 172.16.0.4 | 1 CPU, 1 GiB RAM |
 
 Rocky uses the platform's `rockylinux` image; its major release is controlled by iximiuz. Ubuntu uses `ubuntu-24-04`. These named images are not immutable image digests. Both supplied distributions use the existing `laborant` user with platform-provided cross-machine SSH and passwordless sudo.
 
@@ -64,6 +64,8 @@ After provisioning, the script runs `ansible --version` on the real controller a
 | Saved setup report | `/home/laborant/ansible-lab/setup-details.txt` |
 | Report command | `/home/laborant/ansible-lab/show-details.sh` |
 
+Managed machines are named from their OS and position: `ubuntu-01` / `ubuntu-02` or `rocky-01` / `rocky-02`. A mixed selection can produce `rocky-01` and `ubuntu-02`. These names are used consistently in the VM hostname, terminal tab, inventory, and SSH checks. Tab labels stay within the platform's 20-character limit. The controller remains `controller`, with the tab label `Controller`.
+
 The configuration explicitly uses `/etc/ansible/hosts`. Both managed hostnames are listed in the `managed` group. The report also shows active settings and the inventory graph.
 
 From the controller terminal:
@@ -85,6 +87,25 @@ sudo vim /etc/ansible/hosts
 ```
 
 Other project-local configuration files or the `ANSIBLE_CONFIG` environment variable can override the standard config for ordinary commands. The report helper explicitly selects `/etc/ansible/ansible.cfg`; use `ansible --version` in your working directory to see the active configuration.
+
+## Ready-to-copy management commands
+
+After setup completes, the terminal prints commands with the actual play ID and playground name already filled in. They cover controller SSH, task inspection, listing runs for the template, stopping, restarting, destroying the run, and removing its template. The resolved `labctl` executable path is included so the commands also work immediately after a fresh CLI installation.
+
+Destroy permanently deletes that run's VMs/data. Remove the template only after all its active or stopped runs have been destroyed; the filtered listing command helps identify them. Setup prints these commands and does not execute the stop, destroy or remove actions automatically.
+
+The same command reference is saved on your Mac in:
+
+```text
+.iximiuz-ansible-lab/commands-<actual-play-id>.txt
+.iximiuz-ansible-lab/commands.txt
+```
+
+The first file belongs to that specific run; `commands.txt` contains the latest successful run's reference. To display it later from the repo directory:
+
+```sh
+cat .iximiuz-ansible-lab/commands.txt
+```
 
 ## Reuse, fresh runs and previews
 

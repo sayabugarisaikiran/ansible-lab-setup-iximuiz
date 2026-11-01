@@ -114,6 +114,18 @@ with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as temporary:
                 assert '/etc/ansible/ansible.cfg' in r.stdout
                 assert '/etc/ansible/hosts' in r.stdout
                 assert '/opt/ansible/lib' in r.stdout
+                play_id=(self.state/'play-id').read_text().strip()
+                name=(self.state/'playground-name').read_text().strip()
+                for action in ['stop','restart','destroy']:
+                    assert f'playground {action} "{play_id}"' in r.stdout
+                assert f'playground remove "{name}"' in r.stdout
+                assert f'--filter "playground={name}"' in r.stdout
+                assert r.stdout.index(f'playground destroy "{play_id}"') < r.stdout.index(f'playground remove "{name}"')
+                commands=(self.state/f'commands-{play_id}.txt').read_text()
+                assert commands==(self.state/'commands.txt').read_text()
+                assert f'playground destroy "{play_id}"' in commands
+                assert 'PLAY_ID' not in commands and 'PLAYGROUND_NAME' not in commands
+                assert not any(c[:2] in [['playground','destroy'],['playground','remove'],['playground','stop']] for c in calls)
                 creation=[i for i,c in enumerate(calls) if c[:2]==['playground','create']]
                 if creation:
                     assert calls.index(['playground','list','--quiet']) < creation[0]

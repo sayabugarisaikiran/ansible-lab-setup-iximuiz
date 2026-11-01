@@ -112,8 +112,17 @@ else
   case "$CONTROLLER_OS" in rocky) CONTROLLER_SOURCE=rockylinux; CONTROLLER_LABEL='Rocky Linux' ;; ubuntu) CONTROLLER_SOURCE=ubuntu-24-04; CONTROLLER_LABEL='Ubuntu 24.04' ;; esac
   case "$NODE1_OS" in rocky) NODE1_SOURCE=rockylinux; NODE1_LABEL='Rocky Linux' ;; ubuntu) NODE1_SOURCE=ubuntu-24-04; NODE1_LABEL='Ubuntu 24.04' ;; esac
   case "$NODE2_OS" in rocky) NODE2_SOURCE=rockylinux; NODE2_LABEL='Rocky Linux' ;; ubuntu) NODE2_SOURCE=ubuntu-24-04; NODE2_LABEL='Ubuntu 24.04' ;; esac
-  printf '\nSelected topology:\n  controller  172.16.0.2  %s\n  node-01     172.16.0.3  %s\n  node-02     172.16.0.4  %s\n\n' \
-    "$CONTROLLER_LABEL" "$NODE1_LABEL" "$NODE2_LABEL"
+  NODE1_NAME="${NODE1_OS}-01"
+  NODE2_NAME="${NODE2_OS}-02"
+  # Keep generated hostnames and tab labels comfortably inside the API's
+  # 20-character tab-label limit; choices come from the fixed OS allowlist.
+  for hostname in controller "$NODE1_NAME" "$NODE2_NAME"; do
+    if [ "${#hostname}" -gt 20 ] || ! [[ "$hostname" =~ ^[a-z][a-z0-9-]*$ ]]; then
+      printf 'Invalid generated machine name: %s\n' "$hostname" >&2; exit 2
+    fi
+  done
+  printf '\nSelected topology:\n  %-12s 172.16.0.2  %s\n  %-12s 172.16.0.3  %s\n  %-12s 172.16.0.4  %s\n\n' \
+    controller "$CONTROLLER_LABEL" "$NODE1_NAME" "$NODE1_LABEL" "$NODE2_NAME" "$NODE2_LABEL"
 fi
 
 if [ "$GENERATE_MANIFEST" = true ]; then
@@ -144,7 +153,7 @@ playground:
       resources:
         cpuCount: 1
         ramSize: 2GiB
-    - name: node-01
+    - name: __NODE1_NAME__
       users:
         - name: laborant
           default: true
@@ -159,7 +168,7 @@ playground:
       resources:
         cpuCount: 1
         ramSize: 1GiB
-    - name: node-02
+    - name: __NODE2_NAME__
       users:
         - name: laborant
           default: true
@@ -179,11 +188,11 @@ playground:
       machine: controller
       name: Controller
     - kind: terminal
-      machine: node-01
-      name: __NODE1_LABEL__ Node 1
+      machine: __NODE1_NAME__
+      name: __NODE1_NAME__
     - kind: terminal
-      machine: node-02
-      name: __NODE2_LABEL__ Node 2
+      machine: __NODE2_NAME__
+      name: __NODE2_NAME__
   accessControl:
     canList: [owner]
     canRead: [owner]
@@ -195,8 +204,8 @@ playground:
       mode: "644"
       content: |
         [managed]
-        node-01
-        node-02
+        __NODE1_NAME__
+        __NODE2_NAME__
 
         [managed:vars]
         ansible_user=laborant
@@ -266,7 +275,7 @@ playground:
         /usr/local/bin/ansible --version
     init_node_01_packages:
       init: true
-      machine: node-01
+      machine: __NODE1_NAME__
       user: root
       timeout_seconds: 600
       run: |
@@ -282,7 +291,7 @@ playground:
         esac
     init_node_02_packages:
       init: true
-      machine: node-02
+      machine: __NODE2_NAME__
       user: root
       timeout_seconds: 600
       run: |
@@ -310,7 +319,7 @@ playground:
         export PATH=/usr/local/bin:/usr/bin:/bin:$PATH
         export ANSIBLE_CONFIG=/etc/ansible/ansible.cfg
         cd /home/laborant/ansible-lab
-        for node in node-01 node-02; do
+        for node in __NODE1_NAME__ __NODE2_NAME__; do
           ready=false
           for attempt in $(seq 1 30); do
             if ssh -o BatchMode=yes -o ConnectTimeout=5 \
@@ -337,12 +346,14 @@ YAML
 
 sed -e "s/__CONTROLLER_SOURCE__/$CONTROLLER_SOURCE/g" \
     -e "s/__NODE1_SOURCE__/$NODE1_SOURCE/g" \
+    -e "s/__NODE1_NAME__/$NODE1_NAME/g" \
     -e "s/__NODE2_SOURCE__/$NODE2_SOURCE/g" \
+    -e "s/__NODE2_NAME__/$NODE2_NAME/g" \
     -e "s/__CONTROLLER_LABEL__/$CONTROLLER_LABEL/g" \
     -e "s/__NODE1_LABEL__/$NODE1_LABEL/g" \
     -e "s/__NODE2_LABEL__/$NODE2_LABEL/g" \
     "$STATE_DIR/manifest.template.yaml" > "$STATE_DIR/manifest.yaml"
-printf 'controller=%s\nnode-01=%s\nnode-02=%s\n' "$CONTROLLER_OS" "$NODE1_OS" "$NODE2_OS" \
+printf 'controller=%s\n%s=%s\n%s=%s\n' "$CONTROLLER_OS" "$NODE1_NAME" "$NODE1_OS" "$NODE2_NAME" "$NODE2_OS" \
   > "$STATE_DIR/selected-topology"
 fi
 
@@ -468,7 +479,8 @@ printf 'Waiting for provisioning and verification tasks...\n'
 "$LABCTL" ssh "$PLAY_ID" -m controller -- \
   'set -e; export PATH=/usr/local/bin:/usr/bin:/bin:$PATH; export ANSIBLE_CONFIG=/etc/ansible/ansible.cfg; /usr/local/bin/ansible managed -m ansible.builtin.ping; /usr/local/bin/ansible managed -b -m ansible.builtin.command -a whoami; /home/laborant/ansible-lab/show-details.sh'
 
-cat <<INFO
+COMMANDS_FILE="$STATE_DIR/commands-$PLAY_ID.txt"
+cat <<INFO | tee "$COMMANDS_FILE"
 
 Lab ready.
 Playground: $LAB_NAME
@@ -476,6 +488,12 @@ Play ID:    $PLAY_ID
 
 Open the controller from your Mac:
   "$LABCTL" ssh "$PLAY_ID" -m controller
+
+Inspect provisioning tasks from your Mac:
+  "$LABCTL" playground tasks "$PLAY_ID" -o yaml
+
+List all active/stopped runs belonging to this template:
+  "$LABCTL" playground list --all --filter "playground=$LAB_NAME"
 
 Controller locations:
   Ansible executable: /usr/local/bin/ansible
@@ -493,8 +511,21 @@ Test the two managed nodes:
 Stop and preserve this run:
   "$LABCTL" playground stop "$PLAY_ID"
 
+Restart this run after stopping it:
+  "$LABCTL" playground restart "$PLAY_ID"
+
+Permanently delete this run and its VM data:
+  "$LABCTL" playground destroy "$PLAY_ID"
+
+Then remove its template, after ALL associated active/stopped runs are destroyed:
+  "$LABCTL" playground remove "$LAB_NAME"
+
+These management commands are printed for you to copy; setup does not execute them.
+
 A normal rerun creates another new flexbox playground and run.
 To reuse/resume this saved lab instead: bash "$SCRIPT_DIR/setup-lab.sh" --reuse
 Previous labs are retained; stop them when you no longer need them.
 State directory: $STATE_DIR
+Command reference saved on your Mac: $COMMANDS_FILE
 INFO
+cp "$COMMANDS_FILE" "$STATE_DIR/commands.txt"

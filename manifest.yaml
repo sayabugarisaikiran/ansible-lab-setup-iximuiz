@@ -24,7 +24,7 @@ playground:
       resources:
         cpuCount: 1
         ramSize: 2GiB
-    - name: node-01
+    - name: ubuntu-01
       users:
         - name: laborant
           default: true
@@ -39,7 +39,7 @@ playground:
       resources:
         cpuCount: 1
         ramSize: 1GiB
-    - name: node-02
+    - name: ubuntu-02
       users:
         - name: laborant
           default: true
@@ -59,10 +59,10 @@ playground:
       machine: controller
       name: Rocky Controller
     - kind: terminal
-      machine: node-01
+      machine: ubuntu-01
       name: Ubuntu Node 1
     - kind: terminal
-      machine: node-02
+      machine: ubuntu-02
       name: Ubuntu Node 2
   accessControl:
     canList:

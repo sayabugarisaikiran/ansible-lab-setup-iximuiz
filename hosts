@@ -1,6 +1,6 @@
 [managed]
-node-01
-node-02
+ubuntu-01
+ubuntu-02
 
 [managed:vars]
 ansible_user=laborant

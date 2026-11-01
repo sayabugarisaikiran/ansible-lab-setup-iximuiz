@@ -1,6 +1,7 @@
 import itertools
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -25,20 +26,27 @@ with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as tmp:
         assert '__CONTROLLER_' not in raw and '__NODE1_' not in raw and '__NODE2_' not in raw
         m=parse_yaml(state/'manifest.yaml'); p=m['playground']; manifests.append(p)
         machines=p['machines']
-        assert [x['name'] for x in machines]==['controller','node-01','node-02']
+        names=['controller',f'{node1}-01',f'{node2}-02']
+        assert [x['name'] for x in machines]==names
+        assert len(set(names))==3
+        assert all(re.fullmatch(r'[a-z][a-z0-9-]*',name) and len(name)<=20 for name in names)
         assert [x['drives'][0]['source'] for x in machines]==[{'rocky':'rockylinux','ubuntu':'ubuntu-24-04'}[x] for x in [controller,node1,node2]]
         assert [x['network']['interfaces'][0]['address'] for x in machines]==['172.16.0.2','172.16.0.3','172.16.0.4']
         # The API can accept a template but reject its run if a tab label
         # exceeds 20 characters. Check every supported OS combination.
         assert p['tabs'][0]['name']=='Controller'
         assert all(1 <= len(tab['name']) <= 20 for tab in p['tabs'])
+        assert [tab['machine'] for tab in p['tabs']]==names
+        assert [tab['name'] for tab in p['tabs'][1:]]==names[1:]
         tasks=p['initTasks']
         for name,t in tasks.items():
-            assert t['machine'] in ['controller','node-01','node-02']
+            assert t['machine'] in names
             assert all(dep in tasks for dep in t.get('needs',[]))
             subprocess.run(['bash','-n'],input=t['run'],text=True,check=True)
         files={f['path'].rsplit('/',1)[-1]:f['content'] for f in p['startupFiles']}
-        assert 'node-01\nnode-02' in files['hosts']
+        assert f'{names[1]}\n{names[2]}' in files['hosts']
+        assert f'for node in {names[1]} {names[2]}; do' in tasks['init_verify_setup']['run']
+        assert 'node-01' not in raw and 'node-02' not in raw
         assert 'inventory = /etc/ansible/hosts' in files['ansible.cfg']
         assert {f['path'] for f in p['startupFiles']} == {
             '/etc/ansible/hosts', '/etc/ansible/ansible.cfg',
@@ -60,6 +68,7 @@ with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as tmp:
     r=subprocess.run(['bash',str(launcher),'--dry-run'],input='wrong\n2\n1\n2\n',text=True,capture_output=True,env=dict(os.environ,ANSIBLE_LAB_STATE_DIR=str(state)),check=True)
     assert 'Please enter 1 or 2' in r.stderr
     assert [x['drives'][0]['source'] for x in parse_yaml(state/'manifest.yaml')['playground']['machines']]==['ubuntu-24-04','rockylinux','ubuntu-24-04']
+    assert [x['name'] for x in parse_yaml(state/'manifest.yaml')['playground']['machines']]==['controller','rocky-01','ubuntu-02']
     # Exercise the actual package-manager dispatch blocks with fake managers.
     bindir=base/'bin'; bindir.mkdir(); log=base/'packages.log'
     for tool in ['dnf','apt-get']:
@@ -100,7 +109,7 @@ with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as tmp:
     # Execute the actual report helper against the staged command wrappers.
     configdir=base/'etc/ansible'; configdir.mkdir(parents=True)
     (configdir/'ansible.cfg').write_text('[defaults]\ninventory = '+str(configdir/'hosts')+'\n')
-    (configdir/'hosts').write_text('[managed]\nnode-01\nnode-02\n')
+    (configdir/'hosts').write_text('[managed]\nubuntu-01\nubuntu-02\n')
     report=report.replace('/usr/local/bin',str(globalbin)).replace('/opt/ansible/lib',str(library)).replace('/etc/ansible',str(configdir))
     result=subprocess.run(['bash'],input=report,text=True,capture_output=True,check=True)
     assert 'ansible [core 2.21.9]' in result.stdout
