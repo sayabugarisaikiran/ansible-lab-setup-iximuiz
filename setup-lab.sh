@@ -177,7 +177,7 @@ playground:
   tabs:
     - kind: terminal
       machine: controller
-      name: __CONTROLLER_LABEL__ Controller
+      name: Controller
     - kind: terminal
       machine: node-01
       name: __NODE1_LABEL__ Node 1

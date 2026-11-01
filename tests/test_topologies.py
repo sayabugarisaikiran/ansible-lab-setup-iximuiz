@@ -28,6 +28,10 @@ with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as tmp:
         assert [x['name'] for x in machines]==['controller','node-01','node-02']
         assert [x['drives'][0]['source'] for x in machines]==[{'rocky':'rockylinux','ubuntu':'ubuntu-24-04'}[x] for x in [controller,node1,node2]]
         assert [x['network']['interfaces'][0]['address'] for x in machines]==['172.16.0.2','172.16.0.3','172.16.0.4']
+        # The API can accept a template but reject its run if a tab label
+        # exceeds 20 characters. Check every supported OS combination.
+        assert p['tabs'][0]['name']=='Controller'
+        assert all(1 <= len(tab['name']) <= 20 for tab in p['tabs'])
         tasks=p['initTasks']
         for name,t in tasks.items():
             assert t['machine'] in ['controller','node-01','node-02']
