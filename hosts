@@ -1,0 +1,7 @@
+[managed]
+node-01
+node-02
+
+[managed:vars]
+ansible_user=laborant
+ansible_python_interpreter=/usr/bin/python3

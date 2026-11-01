@@ -1,0 +1,4 @@
+.iximiuz-ansible-lab/
+.DS_Store
+__pycache__/
+tests/tmp*/

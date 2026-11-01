@@ -1,0 +1,73 @@
+kind: playground
+name: ansible-rocky-ubuntu
+title: Ansible Lab - Rocky Controller and Two Ubuntu Nodes
+description: Three-machine Ansible demonstration environment using built-in SSH access.
+categories:
+  - linux
+playground:
+  networks:
+    - name: local
+      subnet: 172.16.0.0/24
+  machines:
+    - name: controller
+      users:
+        - name: laborant
+          default: true
+      drives:
+        - source: rockylinux
+          mount: /
+          size: 10GiB
+      network:
+        interfaces:
+          - network: local
+            address: 172.16.0.2
+      resources:
+        cpuCount: 1
+        ramSize: 2GiB
+    - name: node-01
+      users:
+        - name: laborant
+          default: true
+      drives:
+        - source: ubuntu-24-04
+          mount: /
+          size: 10GiB
+      network:
+        interfaces:
+          - network: local
+            address: 172.16.0.3
+      resources:
+        cpuCount: 1
+        ramSize: 1GiB
+    - name: node-02
+      users:
+        - name: laborant
+          default: true
+      drives:
+        - source: ubuntu-24-04
+          mount: /
+          size: 10GiB
+      network:
+        interfaces:
+          - network: local
+            address: 172.16.0.4
+      resources:
+        cpuCount: 1
+        ramSize: 1GiB
+  tabs:
+    - kind: terminal
+      machine: controller
+      name: Rocky Controller
+    - kind: terminal
+      machine: node-01
+      name: Ubuntu Node 1
+    - kind: terminal
+      machine: node-02
+      name: Ubuntu Node 2
+  accessControl:
+    canList:
+      - owner
+    canRead:
+      - owner
+    canStart:
+      - owner
