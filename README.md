@@ -45,8 +45,9 @@ bash setup-lab.sh --controller rocky --node1 rocky --node2 ubuntu
 - A system-wide Ansible configuration and hosts/inventory file.
 - SSH, passwordless sudo, and Ansible ping checks.
 - A report containing the actual installed version and file locations.
+- tmux and a three-pane recording helper on the controller.
 
-No application/demo playbooks are run. No web server or recording multiplexer is installed by this script. The provided base images may already contain their own standard tools.
+No application/demo playbooks are run and no web server is installed by this script. The provided base images may already contain their own standard tools.
 
 Ansible is installed machine-wide under `/opt/ansible/lib`, with commands under `/usr/local/bin`. There is no virtual environment or activation step. The explicit package destination avoids replacing the distributions' OS-managed Python libraries. Ansible is installed only on the controller.
 
@@ -106,6 +107,18 @@ The first file belongs to that specific run; `commands.txt` contains the latest 
 ```sh
 cat .iximiuz-ansible-lab/commands.txt
 ```
+
+## Three-pane recording view
+
+tmux is installed on either controller OS through its package manager. On the controller, run:
+
+```sh
+~/ansible-lab/recording-view.sh
+```
+
+The controller occupies the left pane; the two managed-node SSH sessions are stacked on the right. The helper uses the actual selected hostnames, such as `ubuntu-01` and `rocky-02`. Mouse selection and divider resizing are enabled. Running the helper again reconnects to the same session. It works in a browser terminal or a Mac terminal connected to the controller.
+
+To detach, press Control+B, release, then D. Reconnect using the helper command. Existing labs created without tmux/helper files require a fresh run to receive the new provisioning; `--reuse` does not rerun init tasks.
 
 ## Reuse, fresh runs and previews
 

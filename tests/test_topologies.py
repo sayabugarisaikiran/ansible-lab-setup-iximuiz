@@ -50,9 +50,15 @@ with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as tmp:
         assert 'inventory = /etc/ansible/hosts' in files['ansible.cfg']
         assert {f['path'] for f in p['startupFiles']} == {
             '/etc/ansible/hosts', '/etc/ansible/ansible.cfg',
-            '/home/laborant/ansible-lab/show-details.sh'}
+            '/home/laborant/ansible-lab/show-details.sh',
+            '/home/laborant/ansible-lab/recording-view.sh'}
         assert 'nginx' not in raw.lower()
-        assert 'tmux' not in raw.lower()
+        recording=files['recording-view.sh']
+        subprocess.run(['bash','-n'],input=recording,text=True,check=True)
+        assert f"'ssh -o BatchMode=yes laborant@{names[1]}'" in recording
+        assert f"'ssh -o BatchMode=yes laborant@{names[2]}'" in recording
+        assert 'mouse on' in recording
+        assert all('tmux' not in tasks[t]['run'] for t in ['init_node_01_packages','init_node_02_packages'])
         assert 'ansible-playbook ' not in tasks['init_verify_setup']['run']
         report=files['show-details.sh']
         subprocess.run(['bash','-n'],input=report,text=True,check=True)
@@ -93,6 +99,8 @@ with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as tmp:
                 calls=log.read_text().splitlines()
                 expected='dnf' if distro=='rocky' else 'apt-get'
                 assert calls and all(x.startswith(expected+' ') for x in calls),calls
+                if task=='init_controller_packages':
+                    assert any('install' in call and 'tmux' in call.split() for call in calls)
     # Run the generated global-launcher creation loop in a staging directory.
     library=base/'opt/ansible/lib'; (library/'bin').mkdir(parents=True)
     globalbin=base/'usr/local/bin'; globalbin.mkdir(parents=True)
@@ -116,4 +124,4 @@ with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as tmp:
     assert 'config file = '+str(configdir/'ansible.cfg') in result.stdout
     assert str(configdir/'hosts') in result.stdout
     assert 'Executable:     '+str(globalbin/'ansible') in result.stdout
-    print('PASS: all 8 OS combinations, no application provisioning, standard config/hosts paths, dynamic version report, menu validation, apt/dnf dispatch and all 9 global launchers. No packages or VMs installed.')
+    print('PASS: all 8 OS combinations, tmux install and selected recording hosts, no application provisioning, standard config/hosts paths, dynamic version report, apt/dnf dispatch and all 9 global launchers. No packages or VMs installed.')

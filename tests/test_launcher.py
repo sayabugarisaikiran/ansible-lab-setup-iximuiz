@@ -114,6 +114,7 @@ with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as temporary:
                 assert '/etc/ansible/ansible.cfg' in r.stdout
                 assert '/etc/ansible/hosts' in r.stdout
                 assert '/opt/ansible/lib' in r.stdout
+                assert '~/ansible-lab/recording-view.sh' in r.stdout
                 play_id=(self.state/'play-id').read_text().strip()
                 name=(self.state/'playground-name').read_text().strip()
                 for action in ['stop','restart','destroy']:

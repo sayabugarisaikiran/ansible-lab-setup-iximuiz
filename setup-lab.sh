@@ -32,7 +32,7 @@ Example without menus:
 
 Existing --reuse labs retain their original OS choices and skip the menus.
 The lab contains one controller and two managed nodes, machine-wide
-Ansible Core 2.21 and its SSH/Python prerequisites. Setup prints the installed
+Ansible Core 2.21, tmux and the SSH/Python prerequisites. Setup prints the installed
 version and the executable, configuration and hosts/inventory file locations.
 State defaults to .iximiuz-ansible-lab/ next to this script. Override it with
 ANSIBLE_LAB_STATE_DIR to use another local state directory.
@@ -241,6 +241,34 @@ playground:
         ansible-config dump --only-changed
         printf '\nInventory:\n'
         ansible-inventory --graph
+    - path: /home/laborant/ansible-lab/recording-view.sh
+      machines: [controller]
+      owner: laborant
+      mode: "755"
+      content: |
+        #!/usr/bin/env bash
+        set -Eeuo pipefail
+        session=ansible-demo
+        if ! tmux has-session -t "$session" 2>/dev/null; then
+          left=$(tmux new-session -d -s "$session" -n lab \
+            -c /home/laborant/ansible-lab -P -F '#{pane_id}')
+          right=$(tmux split-window -h -l '40%' -t "$left" \
+            -P -F '#{pane_id}' 'ssh -o BatchMode=yes laborant@__NODE1_NAME__')
+          bottom=$(tmux split-window -v -l '50%' -t "$right" \
+            -P -F '#{pane_id}' 'ssh -o BatchMode=yes laborant@__NODE2_NAME__')
+          tmux select-pane -t "$left" -T 'Controller'
+          tmux select-pane -t "$right" -T '__NODE1_NAME__'
+          tmux select-pane -t "$bottom" -T '__NODE2_NAME__'
+          tmux set-option -t "$session" mouse on
+          tmux set-option -w -t "$session:lab" pane-border-status top
+          tmux set-option -w -t "$session:lab" pane-border-format ' #{pane_title} '
+          tmux select-pane -t "$left"
+        fi
+        if [ -n "${TMUX:-}" ]; then
+          tmux switch-client -t "$session"
+        else
+          exec tmux attach-session -t "$session"
+        fi
   initTasks:
     init_controller_packages:
       init: true
@@ -252,11 +280,11 @@ playground:
         chown -R laborant:laborant /home/laborant/ansible-lab
         . /etc/os-release
         case "$ID" in
-          rocky) dnf install -y python3.12 python3.12-pip ;;
+          rocky) dnf install -y python3.12 python3.12-pip tmux ;;
           ubuntu)
             export DEBIAN_FRONTEND=noninteractive
             apt-get update
-            apt-get install -y python3.12 python3-pip ;;
+            apt-get install -y python3.12 python3-pip tmux ;;
           *) echo "Unsupported controller OS: $ID" >&2; exit 1 ;;
         esac
         # Machine-wide installation, without venv or changes to distro-managed
@@ -504,6 +532,10 @@ Controller locations:
 
 Show the actual installed version and locations again on the controller:
   ~/ansible-lab/show-details.sh
+
+Open the three-pane tmux recording view on the controller:
+  ~/ansible-lab/recording-view.sh
+  Controller on the left; managed nodes stacked on the right. Click to select panes.
 
 Test the two managed nodes:
   ansible managed -m ansible.builtin.ping
